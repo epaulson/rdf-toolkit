@@ -16,6 +16,7 @@ import * as path from "node:path";
 import * as url from "node:url";
 import fontAssetFilePath from "../assets/fonts/iosevka-aile-custom-light.woff2";
 import scriptAssetFilePath from "../assets/scripts/site.min.js";
+import navFragmentHelperFilePath from "../assets/scripts/navFragmentHelper.min.js"
 import { printDiagnosticsAndExitOnError } from "../diagnostics.js";
 import { Project } from "../model/project.js";
 import { TextFile } from "../model/textfile.js";
@@ -37,6 +38,7 @@ const ERROR_FILE_NAME = "404.html";
 const CSS_FILE_NAME = "style.css";
 const FONT_FILE_NAME = path.basename(fontAssetFilePath);
 const SCRIPT_FILE_NAME = path.basename(scriptAssetFilePath);
+const NAVFRAGMENT_HELPER_FILE_NAME = path.basename(navFragmentHelperFilePath);
 
 class Website implements RenderContext {
     readonly dataset: ParsedTriple[][] = [];
@@ -198,7 +200,7 @@ function renderPage(iri: string, context: Website, links: HtmlContent, scripts: 
             {scripts}
         </head>
         <body>
-            <nav>
+            <nav id="navContent">
                 {navigation}
             </nav>
             <main>
@@ -206,6 +208,10 @@ function renderPage(iri: string, context: Website, links: HtmlContent, scripts: 
             </main>
         </body>
     </html>;
+}
+
+function renderFiller(): HtmlContent {
+    return <div></div>
 }
 
 function resolveHref(url: string, base: string): string {
@@ -243,6 +249,7 @@ export default function main(options: Options): void {
 
     const scripts = <>
         <script src={resolveHref(SCRIPT_FILE_NAME, context.baseURL)}></script>
+        <script src={resolveHref(NAVFRAGMENT_HELPER_FILE_NAME, context.baseURL)}></script>
     </>;
 
     const navigation = renderNavigation(context.title, context);
@@ -250,6 +257,10 @@ export default function main(options: Options): void {
     site.write(CSS_FILE_NAME, fs.readFileSync(path.format({ ...path.parse(moduleFilePath), base: "", ext: ".css" })));
     site.write(FONT_FILE_NAME, fs.readFileSync(path.resolve(modulePath, fontAssetFilePath)));
     site.write(SCRIPT_FILE_NAME, fs.readFileSync(path.resolve(modulePath, scriptAssetFilePath)));
+    site.write(NAVFRAGMENT_HELPER_FILE_NAME, fs.readFileSync(path.resolve(modulePath, navFragmentHelperFilePath)));
+    site.write("navfragment.html", Buffer.from(renderHTML(navigation)));
+
+    const filler = renderFiller();
 
     for (const iconConfig of icons) {
         site.write(path.basename(iconConfig.asset), project.package.read(iconConfig.asset));
@@ -263,6 +274,6 @@ export default function main(options: Options): void {
     site.write(ERROR_FILE_NAME, Buffer.from("<!DOCTYPE html>\n" + renderHTML(render404(context, links, scripts, navigation))));
 
     for (const iri in context.outputs) {
-        site.write(context.outputs[iri] + (context.cleanUrls ? ".html" : ""), Buffer.from("<!DOCTYPE html>\n" + renderHTML(renderPage(iri, context, links, scripts, navigation))));
+        site.write(context.outputs[iri] + (context.cleanUrls ? ".html" : ""), Buffer.from("<!DOCTYPE html>\n" + renderHTML(renderPage(iri, context, links, scripts, filler))));
     }
 }
